@@ -2893,7 +2893,6 @@
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = 3DIMC/threeDIMC.pch;
 				GCC_PREPROCESSOR_DEFINITIONS = (
-					"DEBUG=1",
 					"$(inherited)",
 					"VIEWER_ONLY=1",
 					"VIEWER_HISTO=0",
@@ -2960,6 +2959,11 @@
 				);
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = 3DIMC/threeDIMC.pch;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"VIEWER_ONLY=1",
+					"VIEWER_HISTO=0",
+				);
 				GCC_USE_STANDARD_INCLUDE_SEARCHING = YES;
 				HEADER_SEARCH_PATHS = (
 					/usr/local/include,
