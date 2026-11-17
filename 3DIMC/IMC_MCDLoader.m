@@ -164,13 +164,16 @@
 
     
     NSArray *sortedArray = [unsortedArray sortedArrayUsingComparator:^NSComparisonResult(NSDictionary * a, NSDictionary * b) {
-        return [a [@"OrderNumber"]integerValue] > [b [@"OrderNumber"]integerValue];
+        return [@([a[@"OrderNumber"] integerValue]) compare:@([b[@"OrderNumber"] integerValue])];
     }];
     
+    NSInteger xIndex = 0, yIndex = 1;//MCD convention: X, Y, Z are the first channels
     for (NSDictionary *chan in sortedArray) {
         NSString *chanName = chan[@"ChannelLabel"];
         if(!chanName)chanName = chan[@"ChannelName"];
         if([chan[@"AcquisitionID"]integerValue] != [dict[@"ID"]intValue])continue;
+        if([chan[@"ChannelName"] isEqualToString:@"X"])xIndex = array.count;
+        if([chan[@"ChannelName"] isEqualToString:@"Y"])yIndex = array.count;
         if(chanName)
             [array addObject:chanName];
         else [array addObject:@"Unknown"];
@@ -180,48 +183,46 @@
     if(!stack.origChannels || stack.origChannels.count != array.count)
         stack.origChannels = stack.channels.mutableCopy;
     
-    stack.width = [dict[@"MaxX"]integerValue];
-    stack.height = [dict[@"MaxY"]integerValue];
-    
     NSInteger channelNumber = stack.channels.count;
+    if(channelNumber < 2 || xIndex >= channelNumber || yIndex >= channelNumber)
+        return NO;
+    size_t stepChannels = sizeof(float) * channelNumber;
+    float subBytes[channelNumber];
+
+    //Pixels are stored as records of channelNumber floats, the first ones being X and Y.
+    //For rectangular ROIs every pixel is present in raster order, but for polygon ROIs
+    //only the pixels inside the polygon are stored. So each pixel is placed using its
+    //own X/Y coordinates instead of assuming a complete raster (fixes polygon ROIs).
+    NSInteger maxXSeen = -1, maxYSeen = -1;
+    for (NSUInteger i = beggining; i + stepChannels <= end; i += stepChannels) {
+        [data getBytes:subBytes range:NSMakeRange(i, stepChannels)];
+        maxXSeen = MAX(maxXSeen, (NSInteger)subBytes[xIndex]);
+        maxYSeen = MAX(maxYSeen, (NSInteger)subBytes[yIndex]);
+    }
+
+    stack.width = MAX([dict[@"MaxX"]integerValue], maxXSeen + 1);
+    stack.height = MAX([dict[@"MaxY"]integerValue], maxYSeen + 1);
 
     [stack clearBuffers];
     [stack allocateBufferWithPixels:stack.numberOfPixels];
 
-    
-//    float subBytes;
-//    size_t size = sizeof(float);
-//    NSInteger clockChannels = 0;
-//    NSInteger clockPixs = 0;
-//    for (NSUInteger i = beggining; i < end; i += size) {
-//
-//        if(clockChannels == channelNumber){
-//            clockChannels = 0;
-//            clockPixs++;
-//        }
-//
-//        [data getBytes:&subBytes range:NSMakeRange(i, size)];
-//
-//        stack.stackData[clockChannels][clockPixs] = subBytes;
-//        clockChannels++;
-//    }
-    
-    
-    
-    //Faster load of MCD
-    float subBytes[channelNumber];
-    size_t size = sizeof(float);
-    NSInteger clockPixs = 0;
-    NSInteger stepChannels = size * channelNumber;
     float ** destination = stack.stackData;
+    if(!destination || !destination[0])
+        return NO;
 
-    if(destination){
-        for (NSUInteger i = beggining; i < end; i += stepChannels) {
-            [data getBytes:subBytes range:NSMakeRange(i, stepChannels)];
-            for(NSInteger j = 0; j < channelNumber; ++j)
-                destination[j][clockPixs] = subBytes[j];
-            clockPixs++;
-        }
+    //Channel buffers are one contiguous block; pixels outside a polygon stay 0
+    memset(destination[0], 0, stepChannels * stack.numberOfPixels);
+
+    NSInteger width = stack.width, height = stack.height;
+    for (NSUInteger i = beggining; i + stepChannels <= end; i += stepChannels) {
+        [data getBytes:subBytes range:NSMakeRange(i, stepChannels)];
+        NSInteger x = (NSInteger)subBytes[xIndex];
+        NSInteger y = (NSInteger)subBytes[yIndex];
+        if(x < 0 || y < 0 || x >= width || y >= height)
+            continue;
+        NSInteger pix = y * width + x;
+        for(NSInteger j = 0; j < channelNumber; ++j)
+            destination[j][pix] = subBytes[j];
     }
 
     
@@ -249,7 +250,18 @@
 }
 
 +(CGRect)rectFromArrayOfROIPoints:(NSArray *)array{
-    if (array.count != 4)return CGRectZero;
+    if (array.count < 3)return CGRectZero;
+    if (array.count != 4){
+        //Polygon ROI: use the bounding box of all its points
+        CGFloat minX = CGFLOAT_MAX, minY = CGFLOAT_MAX, maxX = -CGFLOAT_MAX, maxY = -CGFLOAT_MAX;
+        for (NSDictionary *point in array) {
+            CGFloat x = [point[@"PanoramaPixelXPos"]floatValue];
+            CGFloat y = [point[@"PanoramaPixelYPos"]floatValue];
+            minX = MIN(minX, x); maxX = MAX(maxX, x);
+            minY = MIN(minY, y); maxY = MAX(maxY, y);
+        }
+        return CGRectMake(minX, minY, maxX - minX, maxY - minY);
+    }
     CGRect rect;
     rect.origin.x = [array[0][@"PanoramaPixelXPos"]floatValue];
     rect.origin.y = [array[0][@"PanoramaPixelYPos"]floatValue];
