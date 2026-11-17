@@ -85,10 +85,12 @@
     [handle closeFile];
     //NSData *nsData = [NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&error];
     //NSData *nsData = [NSData dataWithContentsOfURL:url options:NSDataReadingMappedIfSafe error:&error];
-    NSMutableData * subdata = [NSMutableData dataWithCapacity:fileSize/10];
-    char * byts = (char *)nsData.bytes;
-    for (char * i = 0; i < byts + fileSize; i += 10){
-        [subdata appendBytes:i length:1];
+    if (!nsData) return nil;
+    const char *byts = (const char *)nsData.bytes;
+    NSUInteger length = nsData.length;
+    NSMutableData *subdata = [NSMutableData dataWithCapacity:length / 10 + 1];
+    for (NSUInteger i = 0; i < length; i += 10) {
+        [subdata appendBytes:byts + i length:1];
     }
     if(error)NSLog(@"Error__ %@", error);
     if (nsData)
