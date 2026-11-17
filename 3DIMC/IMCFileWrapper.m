@@ -137,12 +137,10 @@
         path = [imageStack backStoreTIFFPath];
         
     }
-    NSData *data = [NSData dataWithContentsOfFile:path];
     NSError * error = nil;
-    data = [NSData dataWithContentsOfFile:path options:0 error:&error];
+    NSData *data = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:&error];
     if(error)
         NSLog(@"Error ---- > %@ %@", error, error.userInfo);
-    NSLog(@"%@",data);
     [self loadSingleFiler:imageStack data:data path:path success:success];
 }
 
@@ -171,7 +169,8 @@
 
 -(void)populateJsonDictForMCDImagesFile:(NSString *)path success:(BOOL *)success{
     //if (self.children.count != 1) {
-    NSData *data = [NSData dataWithContentsOfFile:path];
+    //Memory-mapped so that multi-GB MCD files are not copied into RAM
+    NSData *data = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:NULL];
     *success = [IMC_MCDLoader loadMCD:data toIMCFileWrapper:self];
     //}
 }

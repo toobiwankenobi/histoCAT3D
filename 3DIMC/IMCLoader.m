@@ -79,19 +79,20 @@
     
     NSError *error;
 
-    NSFileHandle *handle = [NSFileHandle fileHandleForReadingAtPath:path];
-    unsigned long long fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:path error:nil] fileSize];
-    NSData *nsData = [handle readDataOfLength:MAX(FILE_SAMPLE_BYTES, fileSize)];//This way I don't need to read the whole file
-    [handle closeFile];
+    //Memory-mapped: only the pages that are touched get loaded instead of copying the whole file into RAM.
+    //The checksum is unchanged (every 10th byte of the whole file).
+    NSData *nsData = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:&error];
     //NSData *nsData = [NSData dataWithContentsOfFile:path options:NSDataReadingUncached error:&error];
     //NSData *nsData = [NSData dataWithContentsOfURL:url options:NSDataReadingMappedIfSafe error:&error];
     if (!nsData) return nil;
     const char *byts = (const char *)nsData.bytes;
     NSUInteger length = nsData.length;
-    NSMutableData *subdata = [NSMutableData dataWithCapacity:length / 10 + 1];
-    for (NSUInteger i = 0; i < length; i += 10) {
-        [subdata appendBytes:byts + i length:1];
-    }
+    NSMutableData *subdata = [NSMutableData dataWithLength:length / 10 + 1];
+    char *dst = (char *)subdata.mutableBytes;
+    NSUInteger k = 0;
+    for (NSUInteger i = 0; i < length; i += 10)
+        dst[k++] = byts[i];
+    subdata.length = k;
     if(error)NSLog(@"Error__ %@", error);
     if (nsData)
         return [subdata MD5];

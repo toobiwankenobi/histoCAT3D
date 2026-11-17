@@ -299,24 +299,19 @@
     
     printf("counter %i seach count %lu\n", counter, search.count);
     if (counter > searchCount - 2) {
-        NSMutableData *mut = [NSMutableData dataWithData:[data subdataWithRange:NSMakeRange(whereIsGreater.location - 2, data.length - whereIsGreater.location)]];
-        NSMutableString *xml = @"".mutableCopy;
-        for (int i = 0; i < mut.length; i+=1) {
-            unsigned char bytes;
-            [mut getBytes:&bytes range:NSMakeRange(i, 1)];
-            //if(bytes == 00)continue;
-            
-            NSString *s = [NSString stringWithCString:(void *)&bytes encoding:NSASCIIStringEncoding];
-            //NSLog(@"Para %@ %c de %i", s, bytes, bytes);
-            if(s){
-                if(s.length == 1)[xml appendString:s];
-                else if(s.length > 1)[xml appendString:[s substringToIndex:1]];
-            }
-            //printf("%i ", bytes);
-            //printf("%c ", bytes);
-        }
-        //NSLog(@"METADATA %@", xml);
-        return xml;
+        //Same result as before (keep the ASCII bytes, drop the 0 bytes of the UTF-16 XML), but in one pass
+        //and without creating a string per byte from a non-terminated buffer (undefined behaviour)
+        NSData *sub = [data subdataWithRange:NSMakeRange(whereIsGreater.location - 2, data.length - whereIsGreater.location)];
+        const unsigned char *src = (const unsigned char *)sub.bytes;
+        NSUInteger n = sub.length;
+        NSMutableData *ascii = [NSMutableData dataWithLength:n];
+        unsigned char *dst = (unsigned char *)ascii.mutableBytes;
+        NSUInteger k = 0;
+        for (NSUInteger i = 0; i < n; i++)
+            if (src[i] > 0 && src[i] < 128)
+                dst[k++] = src[i];
+        ascii.length = k;
+        return [[NSString alloc] initWithData:ascii encoding:NSASCIIStringEncoding];
     }
     return nil;
 }
