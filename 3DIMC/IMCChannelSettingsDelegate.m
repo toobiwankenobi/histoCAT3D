@@ -67,4 +67,10 @@
     [self.delegate changed:oldChannel for:newChannel];
 }
 
+-(float)maxValueForChannel:(NSInteger)index{
+    if([self.delegate respondsToSelector:@selector(maxValueForChannel:)])
+        return [self.delegate maxValueForChannel:index];
+    return .0f;
+}
+
 @end

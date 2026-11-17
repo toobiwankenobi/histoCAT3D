@@ -1049,6 +1049,20 @@ typedef enum {
 -(NSArray *)indexesForCell{
     return [NSArray arrayWithArray:self.inOrderIndexes];
 }
+-(float)maxValueForChannel:(NSInteger)index{
+    if(index < 0)
+        return .0f;
+    if(self.inScopeComputations.count > 0){
+        if(index < (NSInteger)self.inScopeComputation.channels.count)
+            return [self.inScopeComputation maxForIndex:index];
+        return .0f;
+    }
+    if(self.inScope3DMask)
+        return .0f;//not supported for 3D masks
+    if(self.inScopeImage && index < (NSInteger)self.inScopeImage.channels.count)
+        return [self.inScopeImage maxForIndex:index];
+    return .0f;
+}
 -(void)didChangeChannel:(NSDictionary *)channelSettings{
     [self refresh];
 }

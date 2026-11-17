@@ -16,6 +16,10 @@
 -(NSInteger)typeOfColoring;
 -(void)changed:(NSInteger)oldChannel for:(NSInteger)newChannel;
 
+@optional
+//Maximum raw value (counts) of a channel, used to convert the Max/Offset sliders to counts. 0 if unknown.
+-(float)maxValueForChannel:(NSInteger)index;
+
 @end
 
 @interface IMCChannelSettings : NSTableCellView
@@ -31,6 +35,10 @@
 @property (nonatomic, weak) IBOutlet NSButton *showOrNot;
 @property (nonatomic, weak) IBOutlet NSSegmentedControl *transformData;
 @property (nonatomic, weak) IBOutlet NSView *background;
+//Text fields next to the Max and Offset sliders to type the values in counts (created in code)
+@property (nonatomic, strong) NSTextField *maxCountField;
+@property (nonatomic, strong) NSTextField *offsetCountField;
+@property (nonatomic, strong) NSTextField *multiplierField;
 @property (nonatomic, assign) NSInteger index;
 @property (nonatomic, assign) NSInteger localIndex;
 

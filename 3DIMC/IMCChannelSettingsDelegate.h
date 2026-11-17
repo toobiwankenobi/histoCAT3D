@@ -19,6 +19,9 @@
 -(NSArray *)indexesForCell;
 -(void)changed:(NSInteger)oldChannel for:(NSInteger)newChannel;
 
+@optional
+-(float)maxValueForChannel:(NSInteger)index;
+
 @end
 
 @interface IMCChannelSettingsDelegate : NSObject<ChannelConfCell, NSTableViewDelegate, NSTableViewDataSource>
