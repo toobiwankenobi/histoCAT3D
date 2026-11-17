@@ -72,6 +72,7 @@ void drawHeat(CGContextRef context, CGRect rect)
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+    dirtyRect = self.bounds;//since the macOS 14 SDK dirtyRect is not guaranteed to equal the view's bounds
     [super drawRect:dirtyRect];
     //BOOL isHeat = [self.delegate isHeatForLegend];
     

@@ -156,6 +156,7 @@ int fltcompare(const void *a,const void *b) {
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
+    dirtyRect = self.bounds;//since the macOS 14 SDK dirtyRect is not guaranteed to equal the view's bounds
     [super drawRect:dirtyRect];
     CGContextRef ctx= [[NSGraphicsContext currentContext] CGContext];
     [self setBackGroundColor:ctx dirtyRect:dirtyRect];
