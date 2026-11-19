@@ -128,6 +128,7 @@
              JSON_DICT_CHANNEL_SETTINGS_OFFSET:[NSNumber numberWithFloat:.0f],
              JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER:[NSNumber numberWithFloat:1.0f],
              JSON_DICT_CHANNEL_SETTINGS_SPF:[NSNumber numberWithFloat:.0f],
+             JSON_DICT_CHANNEL_SETTINGS_GAMMA:[NSNumber numberWithFloat:1.0f],
              JSON_DICT_CHANNEL_SETTINGS_TRANSFORM:[NSNumber numberWithFloat:.0f]
              }.mutableCopy;
 }
@@ -664,6 +665,13 @@
         }
         
     }
+    float gamma = [setts[JSON_DICT_CHANNEL_SETTINGS_GAMMA]floatValue];
+    if(gamma <= .0f)
+        gamma = 1.0f;//older workspaces have no gamma
+    if(settings[6] != gamma){
+        foundDiff = YES;
+        settings[6] = gamma;
+    }
     return foundDiff;
 }
 
@@ -722,13 +730,24 @@
     float preCalcFactor = (float)(settings[5] * settings[0]);
     float preCalcFactor2 = 255 * settings[2] / preCalcFactor;
     
+    float gamma = settings[6] > .0f ? settings[6] : 1.0f;
+    BOOL useGamma = fabsf(gamma - 1.0f) > 1e-4f;
+    float offsetThreshold = settings[1] * 255;
+
     for (NSInteger i = 0; i < pixs; i++) {
         float val = vals[i];
         if(settings[4] == 1.0f)val = logf(val);
         if(settings[4] == 2.0f)val = asinhf(val/5.0f);
-        UInt8 bitValue = MIN(255, val * preCalcFactor2);
-        if(bitValue < settings[1] * 255)bitValue = 0;
-        cachedValues[index][i] = bitValue;
+        float scaled = val * preCalcFactor2;
+        if(!(scaled > .0f))scaled = .0f;//also catches NaN and -inf (log of 0)
+        if(scaled > 255.0f)scaled = 255.0f;
+        if((UInt8)scaled < offsetThreshold){
+            cachedValues[index][i] = 0;
+            continue;
+        }
+        if(useGamma)
+            scaled = 255.0f * powf(scaled / 255.0f, gamma);
+        cachedValues[index][i] = (UInt8)scaled;
     }
     
     //if(settings[3] > 0)
@@ -1334,13 +1353,8 @@ typedef enum{
     cachedValues[index] = (UInt8 *)calloc(self.mask.imageStack.numberOfPixels, sizeof(UInt8));
     
     if(cachedSettings[index] == NULL){
-        cachedSettings[index] = (float *)calloc(6, sizeof(float));
-        cachedSettings[index][0] = .0f;
-        cachedSettings[index][1] = .0f;
-        cachedSettings[index][2] = .0f;
-        cachedSettings[index][3] = .0f;
-        cachedSettings[index][4] = .0f;
-        cachedSettings[index][5] = .0f;
+        //MaxOffset, Offset, Multiplier, SPF, Transform, Max, Gamma
+        cachedSettings[index] = (float *)calloc(7, sizeof(float));
     }
 }
 -(void)clearCacheBuffers{

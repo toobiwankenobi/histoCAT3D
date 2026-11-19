@@ -101,6 +101,7 @@
 #define JSON_DICT_CHANNEL_SETTINGS_OFFSET @"json_dict_channel_settings_offset"
 #define JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER @"json_dict_channel_settings_multiplier"
 #define JSON_DICT_CHANNEL_SETTINGS_SPF @"json_dict_channel_settings_spf"
+#define JSON_DICT_CHANNEL_SETTINGS_GAMMA @"json_dict_channel_settings_gamma"
 #define JSON_DICT_CHANNEL_SETTINGS_COLOR @"json_dict_channel_settings_color"
 #define JSON_DICT_CHANNEL_SETTINGS_TRANSFORM @"json_dict_channel_settings_transform"
 

@@ -9,18 +9,41 @@
 #import "IMCChannelSettings.h"
 #import "IMCImageGenerator.h"
 
+//The Mult row is used for Gamma. The slider works in log2 units so that gamma 1 sits in the middle.
+#define GAMMA_MIN 0.2f
+#define GAMMA_MAX 5.0f
+
 @implementation IMCChannelSettings
 
 -(void)awakeFromNib{
     [super awakeFromNib];
     if(self.maxCountField)
         return;
+    //Make room for the labels ("Offset" and "Gamma" were cut off)
+    for (NSSlider *slider in @[self.maxOffset ?: [NSNull null], self.offset ?: [NSNull null],
+                               self.multiplier ?: [NSNull null], self.pixelFilter ?: [NSNull null]]) {
+        if((id)slider == [NSNull null])
+            continue;
+        NSRect frame = slider.frame;
+        frame.origin.x += 8;
+        frame.size.width -= 8;
+        slider.frame = frame;
+    }
+    //Mult row becomes Gamma
+    for (NSView *view in self.subviews)
+        if([view isKindOfClass:[NSTextField class]] && ![(NSTextField *)view isEditable]
+           && [[(NSTextField *)view stringValue] isEqualToString:@"Mult"])
+            [(NSTextField *)view setStringValue:@"Gamma"];
+    self.multiplier.minValue = log2f(GAMMA_MIN);
+    self.multiplier.maxValue = log2f(GAMMA_MAX);
+    self.multiplier.doubleValue = 0;
+
     self.maxCountField = [self countFieldNextToSlider:self.maxOffset
                                               toolTip:@"Max in counts (values at or above are shown at full intensity)"];
     self.offsetCountField = [self countFieldNextToSlider:self.offset
                                                  toolTip:@"Offset in counts (values below are shown black)"];
     self.multiplierField = [self countFieldNextToSlider:self.multiplier
-                                                toolTip:@"Multiplier (brightness gain)"];
+                                                toolTip:@"Gamma (1 = linear)"];
     //SPF: allow 0 = filter off (the slider in the XIB starts at 1, so the filter was always on once touched)
     self.pixelFilter.minValue = 0;
     self.pixelFilterField = [self countFieldNextToSlider:self.pixelFilter
@@ -49,12 +72,12 @@
 -(void)addToolTips{
     NSDictionary *tips = @{
         @"Max":    @"Upper limit of the display in counts. Values at or above are shown at full brightness. Lower = brighter image.",
-        @"Offset": @"Values below this (in counts) are shown black. Set as a fraction of Max, so it follows Max and Mult.",
-        @"Mult":   @"Brightness multiplier. Divides the displayed range: Max (and Offset) shrink by this factor.",
+        @"Offset": @"Values below this (in counts) are shown black. Set as a fraction of Max, so it follows Max.",
+        @"Gamma":  @"Brightness curve. 1 = linear; below 1 brightens dim structures, above 1 darkens dim signal and increases contrast.",
         @"SPF":    @"Single pixel filter: removes isolated bright pixels (noise). 0 = off."
     };
     NSDictionary *controls = @{@"Max": self.maxOffset ?: [NSNull null], @"Offset": self.offset ?: [NSNull null],
-                               @"Mult": self.multiplier ?: [NSNull null], @"SPF": self.pixelFilter ?: [NSNull null]};
+                               @"Gamma": self.multiplier ?: [NSNull null], @"SPF": self.pixelFilter ?: [NSNull null]};
     for (NSView *view in self.subviews) {
         if(![view isKindOfClass:[NSTextField class]] || [(NSTextField *)view isEditable])
             continue;
@@ -74,8 +97,8 @@
 -(NSAttributedString *)helpText{
     NSArray *entries = @[
         @[@"Max", @"Upper limit of the display, in counts. Values at or above Max are shown at full brightness. Lower Max = brighter image."],
-        @[@"Offset", @"Values below the offset (in counts) are shown black. Use it to remove background signal. Internally it is a fraction of Max, so it moves together with Max and Mult."],
-        @[@"Mult", @"Brightness multiplier (1–10). It divides the displayed range: with Mult 2, Max and Offset are halved and the image gets brighter. The number fields always show the resulting range in counts."],
+        @[@"Offset", @"Values below the offset (in counts) are shown black. Use it to remove background signal. Internally it is a fraction of Max, so it moves together with Max."],
+        @[@"Gamma", @"Shape of the brightness curve between Offset and Max (0.2–5). 1 = linear. Below 1 brightens dim structures without saturating bright ones; above 1 suppresses dim signal and increases contrast. Max and Offset are not affected."],
         @[@"SPF", @"Single pixel filter. Removes isolated bright pixels (noise) that are much brighter than their surroundings. 0 = off; higher values filter more strongly and can also remove small, dim structures. Slows down redrawing."],
         @[@"UT / Log / Asinh", @"Transformation of the counts: untransformed, logarithm, or arcsinh(counts / 5). Log and Asinh compress bright values so that dim structures become visible. The number fields for Max and Offset only work with UT."],
         @[@"Colour", @"Colour of the channel. Can be changed when the colouring mode is set to custom colours."],
@@ -169,7 +192,7 @@
 }
 
 -(void)updateCountFields{
-    self.multiplierField.floatValue = self.multiplier.floatValue;//always available
+    self.multiplierField.floatValue = exp2f(self.multiplier.floatValue);//gamma, always available
     self.pixelFilterField.floatValue = self.pixelFilter.floatValue;
 
     float max = [self channelMax];
@@ -182,9 +205,8 @@
         return;
     }
     //Both fields show the range that is actually displayed, in counts:
-    //values >= Max are full brightness, values < Offset are black. Mult divides that range.
-    float mult = MAX(self.multiplier.floatValue, 1e-6f);
-    float displayedMax = max * self.maxOffset.floatValue / mult;
+    //values >= Max are full brightness, values < Offset are black.
+    float displayedMax = max * self.maxOffset.floatValue;
     self.maxCountField.floatValue = displayedMax;
     self.offsetCountField.floatValue = self.offset.floatValue * displayedMax;
 }
@@ -196,7 +218,8 @@
            oldMult = self.multiplier.doubleValue, oldSPF = self.pixelFilter.doubleValue;
 
     if(sender == self.multiplierField){
-        self.multiplier.floatValue = MIN(self.multiplier.maxValue, MAX(self.multiplier.minValue, sender.floatValue));
+        float gamma = MIN(GAMMA_MAX, MAX(GAMMA_MIN, sender.floatValue));
+        self.multiplier.floatValue = log2f(gamma);
     }else if(sender == self.pixelFilterField){
         self.pixelFilter.floatValue = MIN(self.pixelFilter.maxValue, MAX(self.pixelFilter.minValue, sender.floatValue));
     }else{
@@ -206,18 +229,12 @@
             return;
         }
         float value = MAX(.0f, sender.floatValue);
-        float mult = MAX(self.multiplier.floatValue, 1e-6f);
         if(sender == self.maxCountField){
             //Never exactly 0 (the image generator divides by it), but allow down to 0.01 counts
             value = MIN(max, MAX(value, 0.01f));
-            //If the value is out of reach with the current Mult, lower Mult so it can be displayed
-            if(value * mult > max){
-                mult = MAX((float)self.multiplier.minValue, max / value);
-                self.multiplier.floatValue = mult;
-            }
-            self.maxOffset.floatValue = MIN(1.0f, value * mult / max);
+            self.maxOffset.floatValue = MIN(1.0f, value / max);
         }else if(sender == self.offsetCountField){
-            float displayedMax = max * self.maxOffset.floatValue / mult;
+            float displayedMax = max * self.maxOffset.floatValue;
             self.offset.floatValue = displayedMax > .0f ? MIN(1.0f, value / displayedMax) : .0f;
         }
     }
@@ -242,9 +259,22 @@
 
 -(void)setSettingsDictionary:(NSMutableDictionary *)settingsDictionary{
     _settingsDictionary = settingsDictionary;
+
+    //Mult is replaced by Gamma in the UI. Fold an existing multiplier into Max (Max / Mult with Mult 1
+    //renders identically), so older workspaces look exactly as before.
+    float mult = [[settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER]floatValue];
+    if(mult > .0f && fabsf(mult - 1.0f) > 1e-6f){
+        float maxOffset = [[settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_MAXOFFSET]floatValue];
+        [settingsDictionary setValue:@(maxOffset / mult) forKey:JSON_DICT_CHANNEL_SETTINGS_MAXOFFSET];
+        [settingsDictionary setValue:@1.0f forKey:JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER];
+    }
+    float gamma = [[settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_GAMMA]floatValue];
+    if(gamma <= .0f)
+        gamma = 1.0f;
+
     self.maxOffset.floatValue = [[self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_MAXOFFSET]floatValue];
     self.offset.floatValue = [[self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_OFFSET]floatValue];
-    self.multiplier.floatValue = [[self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER]floatValue];
+    self.multiplier.floatValue = log2f(MIN(GAMMA_MAX, MAX(GAMMA_MIN, gamma)));
     self.pixelFilter.floatValue = [[self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_SPF]floatValue];
     [self.transformData setSelectedSegment:MAX(0,MIN(2,[[self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_TRANSFORM]integerValue]))];
     if([self.settingsDictionary valueForKey:JSON_DICT_CHANNEL_SETTINGS_COLOR])
@@ -256,7 +286,10 @@
 -(void)selectedChannel:(id)sender{
     [self.settingsDictionary setValue:[NSNumber numberWithFloat:self.maxOffset.floatValue] forKey:JSON_DICT_CHANNEL_SETTINGS_MAXOFFSET];
     [self.settingsDictionary setValue:[NSNumber numberWithFloat:self.offset.floatValue] forKey:JSON_DICT_CHANNEL_SETTINGS_OFFSET];
-    [self.settingsDictionary setValue:[NSNumber numberWithFloat:self.multiplier.floatValue] forKey:JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER];
+    [self.settingsDictionary setValue:[NSNumber numberWithFloat:1.0f] forKey:JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER];
+    //Round so that the middle of the slider gives exactly 1 (linear)
+    float gamma = roundf(exp2f(self.multiplier.floatValue) * 100.0f) / 100.0f;
+    [self.settingsDictionary setValue:[NSNumber numberWithFloat:gamma] forKey:JSON_DICT_CHANNEL_SETTINGS_GAMMA];
     [self.settingsDictionary setValue:[NSNumber numberWithFloat:self.pixelFilter.floatValue] forKey:JSON_DICT_CHANNEL_SETTINGS_SPF];
     [self.settingsDictionary setValue:[NSNumber numberWithInteger:self.transformData.selectedSegment] forKey:JSON_DICT_CHANNEL_SETTINGS_TRANSFORM];
     [self.settingsDictionary setValue:[self.color.color hexEncoding] forKey:JSON_DICT_CHANNEL_SETTINGS_COLOR];
