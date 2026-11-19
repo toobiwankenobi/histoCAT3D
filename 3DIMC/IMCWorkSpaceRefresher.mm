@@ -296,7 +296,24 @@
 -(void)intensityLegend{
     self.parent.colorLegend.hidden = (self.parent.inScopeImages.count != 1);
     self.parent.colorLegend.maxsForLegend = [self.parent.inScopeImage maxesForIndexArray:[self.parent indexesForCell]];
-    self.parent.colorLegend.maxOffsetsForLegend = [self.parent.inScopeImage maxOffsetsForIndexArray:[self.parent indexesForCell]];
+    //Divide by the multiplier so that the legend shows the counts that are displayed at full brightness
+    NSArray *legendIndexes = [self.parent indexesForCell];
+    NSArray *maxOffsets = [self.parent.inScopeImage maxOffsetsForIndexArray:legendIndexes];
+    NSArray *settings = self.parent.inScopeImage.channelSettings;
+    NSMutableArray *effectiveMaxOffsets = [NSMutableArray arrayWithCapacity:maxOffsets.count];
+    for (NSInteger i = 0; i < (NSInteger)maxOffsets.count; i++) {
+        float mult = 1.0f;
+        if(i < (NSInteger)legendIndexes.count){
+            NSInteger channel = [legendIndexes[i] integerValue];
+            if(channel >= 0 && channel < (NSInteger)settings.count){
+                float m = [settings[channel][JSON_DICT_CHANNEL_SETTINGS_MULTIPLIER] floatValue];
+                if(m > .0f)
+                    mult = m;
+            }
+        }
+        [effectiveMaxOffsets addObject:@([maxOffsets[i] floatValue] / mult)];
+    }
+    self.parent.colorLegend.maxOffsetsForLegend = effectiveMaxOffsets;
     self.parent.colorLegend.minsForLegend = [self minsForLegend];
     self.parent.colorLegend.inflexionPointsForLegend = [self inflexionPointsForLegend];
     self.parent.colorLegend.colorsForLegend = self.parent.colorSpaceSelector.selectedSegment != 3?[self.parent.customChannelsDelegate collectColors]:nil;

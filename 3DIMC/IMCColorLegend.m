@@ -83,8 +83,8 @@ void drawHeat(CGContextRef context, CGRect rect)
     if(self.minsForLegend.count == count && self.inflexionPointsForLegend.count == count){
         float upperLowerFreePortions = 0.035f;//5% up and down for min and max values
         float gapForNum = dirtyRect.size.height * upperLowerFreePortions;
-        for (NSNumber *num in self.maxsForLegend) {
-            NSInteger idx = [self.maxsForLegend indexOfObject:num];
+        for (NSInteger idx = 0; idx < count; idx++) {
+            NSNumber *num = self.maxsForLegend[idx];//indexOfObject: returned the wrong index when two channels had the same max
             float y = (dirtyRect.size.height / count) * idx;
             
             CGRect rect = CGRectMake(0,
@@ -106,7 +106,8 @@ void drawHeat(CGContextRef context, CGRect rect)
             else
                 drawLinearGradient(context, rect, color.CGColor, startColor.CGColor);
             
-            [General drawIntAsString:num.floatValue * [self.maxOffsetsForLegend[[self.maxsForLegend indexOfObject:num]]floatValue] WithFontName:@"Helvetica" size:10.0f rect:
+            float maxOffset = idx < (NSInteger)self.maxOffsetsForLegend.count ? [self.maxOffsetsForLegend[idx]floatValue] : 1.0f;
+            [General drawIntAsString:num.floatValue * maxOffset WithFontName:@"Helvetica" size:10.0f rect:
              CGRectMake(0,
                         y + (dirtyRect.size.height / count) - gapForNum,
                         dirtyRect.size.width,
