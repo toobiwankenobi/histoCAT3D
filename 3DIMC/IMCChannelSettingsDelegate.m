@@ -18,6 +18,12 @@
     return [self.delegate indexesForCell].count;
 }
 
+//The rows only hold controls (sliders, fields); selecting a row highlights it in blue and makes the
+//first click select the row instead of reaching the control, so row selection is disabled.
+-(BOOL)tableView:(NSTableView *)tableView shouldSelectRow:(NSInteger)row{
+    return NO;
+}
+
 -(id)tableView:(NSTableView *)tableView viewForTableColumn:(nullable NSTableColumn *)tableColumn row:(NSInteger)row{
     
     IMCChannelSettings *infoView = [tableView makeViewWithIdentifier:@"ChannelSettings" owner:self];
