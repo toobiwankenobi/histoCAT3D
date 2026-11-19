@@ -39,6 +39,10 @@
 @property (nonatomic, strong) NSTextField *maxCountField;
 @property (nonatomic, strong) NSTextField *offsetCountField;
 @property (nonatomic, strong) NSTextField *multiplierField;
+@property (nonatomic, strong) NSTextField *pixelFilterField;
+//Help button with a popover explaining the controls (created in code)
+@property (nonatomic, strong) NSButton *helpButton;
+@property (nonatomic, strong) NSPopover *helpPopover;
 @property (nonatomic, assign) NSInteger index;
 @property (nonatomic, assign) NSInteger localIndex;
 
